@@ -1,0 +1,117 @@
+#!/bin/sh
+
+
+#
+# SET VARIABLES
+#
+WD=`pwd`
+SCRATCH="/scratch"
+QUEUE="default"
+
+NPROC=1
+NODES=1
+PPN=1
+
+#
+# PARSE ARGUMENTS
+#
+while [ $# -gt 0 ]
+do
+    case "$1" in
+    (-*np) NPROC="$2"; shift;;
+    (-*nodes) NODES="$2"; shift;;
+    (-*ppn) PPN="$2"; shift;;
+    (-*q) QUEUE="$2"; shift;;
+    (-*charge) PBSOPTSS="-A $2" shift;;
+    (-*f) FORCERENAME="1";;
+    (-*emailwhendone) PBSOPTS="-m ae";;
+    (-*) echo "Unrecognized Option $1" 1>&2; exit 1;;
+    (*)  break;;
+    esac
+    shift
+done
+
+#
+# CHECK FOR INPUT FILE
+#
+INPUTFILE=$1
+BASENAME=$2
+if [ $# -ne 2 ]
+then
+  echo "Usage: <ABINIT files file> <ABINIT _o BASE NAME>"
+  exit 1
+fi
+
+DEN_NAME="${BASENAME}_o_DS2_DEN"
+OUTFILE_NAME="${BASENAME}.out"
+OUTPUTFILE=${INPUTFILE%.?????}.log
+JOBNAME=${INPUTFILE%.?????}
+
+echo "Den file: $DEN_NAME"
+echo "Out file: $OUTFILE_NAME"
+echo "This program will help you to process the output of ABINIT calculation."
+echo "It will make electron density profiles and run Bader calculation."
+
+if [ ! -f $1 ]
+then
+  echo "File $1 not found!"
+  exit 1
+fi
+
+#
+# PARSE AND SET NPROCS
+#
+if [ $NPROC -gt 20 ]
+then
+  if [ $NODES -eq 1 ]
+    then
+        echo "Please set number of nodes with the -nodes argument"
+        exit
+    fi
+fi
+
+PPN=$((NPROC/$NODES))
+NPROC=$((PPN*$NODES))
+
+if [ $NODES -gt 1 ]
+then
+	SCRATCH="/nfs/scratch"
+fi
+
+
+#
+# SET PBS OPTIONS
+#
+OPTIONS="-o /dev/null -e /dev/null -q $QUEUE"
+PBSOPTS="-N $JOBNAME -l nodes=$NODES:ppn=$PPN $PBSOPTS $PBSOPTSS"
+
+#
+# CREATE PBS INPUT FILE
+#
+TARGET=run.$$.sh
+
+cat >> $TARGET << EOF
+#!/bin/bash
+#PBS $PBSOPTS
+
+source /opt/intel/compilers_and_libraries_2017.1.132/linux/bin/compilervars.sh intel64
+. /usr/mpi/openmpi_intel/2.0.1/bin/mpivars.sh 
+
+cd $WD
+mkdir -p $SCRATCH/\$PBS_JOBID
+
+bin2xsf $DEN_NAME
+mkden_all_elements $1
+mpirun -n 1 ~/bin/AddCore $DEN_NAME $OUTFILE_NAME < AddCore_input
+sleep 3
+
+mpirun -n 1 bader -p all_atom CHGCAR -ref CHGCAR_sum
+sleep 3
+
+rm -rf $SCRATCH/\$PBS_JOBID
+
+EOF
+
+# Submit the input file to PBS and clean up
+qsub $OPTIONS $TARGET
+rm $TARGET

@@ -1,0 +1,136 @@
+#!/bin/sh
+
+
+#
+# SET VARIABLES
+#
+WD=`pwd`
+SCRATCH="/scratch"
+QUEUE="default"
+
+NPROC=1
+NODES=1
+PPN=1
+
+#
+# PARSE ARGUMENTS
+#
+while [ $# -gt 0 ]
+do
+    case "$1" in
+    (-*np) NPROC="$2"; shift;;
+    (-*nodes) NODES="$2"; shift;;
+    (-*ppn) PPN="$2"; shift;;
+    (-*q) QUEUE="$2"; shift;;
+    (-*charge) PBSOPTSS="-A $2" shift;;
+    (-*f) FORCERENAME="1";;
+    (-*emailwhendone) PBSOPTS="-m ae";;
+    (-*) echo "Unrecognized Option $1" 1>&2; exit 1;;
+    (*)  break;;
+    esac
+    shift
+done
+
+#
+# CHECK FOR INPUT FILE
+#
+INPUTFILE=$1
+BASENAME=$2
+if [ $# -ne 2 ]
+then
+  echo "Usage: <ABINIT files file> <ABINIT _o BASE NAME>"
+  echo "Optional arguments:"
+  echo " -np [number of cores]"
+  echo " -nodes [number of total nodes]"
+  echo " -ppn [cores per node]"
+  echo " -q [Queue Name] (Run job in queue [Queue Name])"
+  echo " -f (force a rename of existing output .log file)"
+  echo " -emailwhendone (email you when job completes, requires .forward file in
+ home directory)"
+  echo " -charge [group,fund number] (charge to group and fund, please provide both)"
+  exit 1
+fi
+
+DEN_NAME="${BASENAME}_o_DS2_DEN"
+OUTFILE_NAME="${BASENAME}.out"
+OUTPUTFILE=${INPUTFILE%.?????}.log
+JOBNAME=${INPUTFILE%.?????}
+
+echo "Den file: $DEN_NAME"
+echo "Out file: $OUTFILE_NAME"
+
+if [ ! -f $1 ]
+then
+  echo "File $1 not found!"
+  exit 1
+fi
+
+if [ "$FORCERENAME" = "1" ]
+then
+  mv $OUTPUTFILE $OUTPUTFILE.`date +%s`
+  echo "-f argument invoked!"
+  echo "$OUTPUTFILE renamed to $OUTPUTFILE.`date +%s`"
+elif [ -f $OUTPUTFILE ]
+then
+  echo "Output file with name $OUTPUTFILE exists."
+  echo "Please rename .files input file ($1) or use the -f"
+  echo "argument to force a rename."
+  exit 1
+fi
+
+#
+# PARSE AND SET NPROCS
+#
+if [ $NPROC -gt 20 ]
+then
+  if [ $NODES -eq 1 ]
+    then
+        echo "Please set number of nodes with the -nodes argument"
+        exit
+    fi
+fi
+
+PPN=$((NPROC/$NODES))
+NPROC=$((PPN*$NODES))
+
+if [ $NODES -gt 1 ]
+then
+	SCRATCH="/nfs/scratch"
+fi
+
+
+#
+# SET PBS OPTIONS
+#
+OPTIONS="-o /dev/null -e /dev/null -q $QUEUE"
+PBSOPTS="-N $JOBNAME -l nodes=$NODES:ppn=$PPN $PBSOPTS $PBSOPTSS"
+
+#
+# CREATE PBS INPUT FILE
+#
+TARGET=run.$$.sh
+
+cat >> $TARGET << EOF
+#!/bin/bash
+#PBS $PBSOPTS
+
+source /opt/intel/compilers_and_libraries_2017.1.132/linux/bin/compilervars.sh intel64
+. /usr/mpi/openmpi_intel/2.0.1/bin/mpivars.sh 
+
+cd $WD
+cp -f $INPUTFILE /tmp/$INPUTFILE.$USER
+sed 5s@.*@$SCRATCH/\$PBS_JOBID/tmp@ /tmp/$INPUTFILE.$USER > $INPUTFILE
+mkdir -p $SCRATCH/\$PBS_JOBID
+
+cat \`head -1 $INPUTFILE\` > $OUTPUTFILE
+
+mpirun -n $NPROC /share/apps/abinit/bin/abinit < $INPUTFILE > $OUTPUTFILE
+sleep 3
+
+rm -rf $SCRATCH/\$PBS_JOBID
+
+EOF
+
+# Submit the input file to PBS and clean up
+qsub $OPTIONS $TARGET
+rm $TARGET

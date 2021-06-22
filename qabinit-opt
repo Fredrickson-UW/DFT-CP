@@ -1,0 +1,264 @@
+#!/bin/sh
+
+
+#
+# SET VARIABLES
+#
+WD=`pwd`
+SCRATCH="/scratch"
+QUEUE="default"
+
+NPROC=1
+NODES=1
+PPN=1
+
+#
+# PARSE ARGUMENTS
+#
+while [ $# -gt 0 ]
+do
+    case "$1" in
+    (-*np) NPROC="$2"; shift;;
+    (-*nodes) NODES="$2"; shift;;
+    (-*ppn) PPN="$2"; shift;;
+    (-*q) QUEUE="$2"; shift;;
+    (-*charge) PBSOPTSS="-A $2" shift;;
+    (-*f) FORCERENAME="1";;
+    (-*emailwhendone) PBSOPTS="-m ae";;
+    (-*) echo "Unrecognized Option $1" 1>&2; exit 1;;
+    (*)  break;;
+    esac
+    shift
+done
+
+#
+# CHECK FOR INPUT FILE
+#
+INPUTFILE=$1
+BASENAME=$2
+echo "BASE NAME: $2"
+INFILE_NAME="${BASENAME}.in"
+LOGFILE_NAME="${BASENAME}.log"
+OUTFILE_NAME="${BASENAME}.out"
+CIFFILE_NAME="${BASENAME}.cif"
+OPTCELL0_INFILE_NAME="${BASENAME}_optcell0.in"
+OPTCELL2_INFILE_NAME="${BASENAME}_optcell2.in"
+OPTCELL0_OUTFILE_NAME="${BASENAME}_optcell0.out"
+OPTCELL2_OUTFILE_NAME="${BASENAME}_optcell2.out"
+OPTIONS_NAME="prepareABINIT-options-${BASENAME}"
+
+if [ "$INPUTFILE" = "" ] || [ "$BASENAME" = "" ]
+then
+  echo "Usage: qabinit arguments inputfile.files base_name for calculation"
+  echo "Optional arguments:"
+  echo " -np [number of cores]"
+  echo " -nodes [number of total nodes]"
+  echo " -ppn [cores per node]"
+  echo " -q [Queue Name] (Run job in queue [Queue Name])"
+  echo " -f (force a rename of existing output .log file)"
+  echo " -emailwhendone (email you when job completes, requires .forward file in
+ home directory)"
+  echo " -charge [group,fund number] (charge to group and fund, please provide both)"
+  exit 1
+fi
+
+if [ ! -f $CIFFILE_NAME ]
+then
+  echo "The CIF file $CIFFILE_NAME does not exist."
+  echo "Please double check. Exiting the shell script now."
+  exit 1
+fi
+
+if [ ! -f $INFILE_NAME ]
+then
+  echo "The file $INFILE_NAME does not exist."
+  echo "This script will first generate .in file for the calculation."
+  if [ ! -f $OPTIONS_NAME ]
+    then
+    echo "No previous -OPTIONS file exists. Will ask for the options below"
+    read -p "Do you wish to use the default settings for this calculation? [1=Yes] [2=No]   " default_flag
+    echo "default flag; $default_flag"
+    if [ $default_flag = 1 ]
+    then
+      echo "Using default for this calculation. Here are the default:"
+      echo
+      echo "1. Convert to primitive cell if the given geometry is non-primitive."
+      echo "2. Use semicore pseudopotential only for 11 or 12 electron d-elements."
+      echo "3. Use ngkpt to specify the K-points mesh."
+      echo "4. No spin orbit coupling."
+      echo
+      convert_primitive_flag=1
+      scvo_flag=1
+      kmesh_flag=1
+      SOC_flag=1
+    elif [ $default_flag = 2 ]
+    then
+      echo "Not using default for this calculation."
+      echo
+      echo "Please specify your settings for this calculation below."
+      read -p "Do you want abinit to convert your unit cell to primitive if it is not? [1=Yes] [2=No]    " convert_primitive_flag
+      read -p "What kind of pseudopotential do you wish to use? [1=semicore only for 11 or 12 electron d-elements] [2=semicore when possible]   " scvo_flag
+      read -p "How do you want to specify your K-point mesh? [1=ngkpt] [2=kptrlatt]    " kmesh_flag
+      read -p "Do you want to enable spin orbit coupling? [1=No] [2=Yes]    " SOC_flag
+    else
+      echo "Input must be 1 or 2. Exiting the shell script."
+      exit 1
+    fi
+    echo "convert_primitive_flag: $convert_primitive_flag"
+    echo "scvo_flag: $scvo_flag"
+    echo "kmesh_flag: $kmesh_flag"
+    echo "SOC_flag: $SOC_flag"
+    echo 2 > OPTIONS
+    echo 2 >> OPTIONS
+    echo $convert_primitive_flag >> OPTIONS
+    echo $scvo_flag >> OPTIONS
+    echo $kmesh_flag >> OPTIONS
+    echo "Done setting up OPTIONS file."
+  else
+    echo "An old -OPTIONS file exists, probably from k-point mesh calculaiton."
+    echo "OPTIONS file will be set up automatically"
+    read -p "Press enter to continue"
+    echo 2 > OPTIONS
+    cat $OPTIONS_NAME >> OPTIONS
+  fi
+  prepareAbinit7 $CIFFILE_NAME $BASENAME $USER $OPTCELL0_OUTFILE_NAME $OPTCELL0_INFILE_NAME < OPTIONS
+  #echo "Your calculation has been setup."
+  #echo "Look at the output, adjust accordinly and then rerun to submit the ABINIT calculation to the queue."
+  exit 0
+  else
+  echo "ABINIT input files already exist."
+  echo "If there are old optcell0 optcell2 expanded or contracted folders, this calculation will overwrite them."
+  read -p "Press enter to submit the ABINIT calculation to the queue."
+fi
+
+echo "Your ABINIT geometry optimization has been submitted."
+echo "Afterwards, you should run DFT single point calculations in contracted, expanded and original folders"
+
+rm -rf optcell0 optcell2 expanded contracted
+OUTPUTFILE=${INPUTFILE%.?????}.log
+JOBNAME=${INPUTFILE%.?????}
+
+if [ ! -f $1 ]
+then
+  echo "File $1 not found!"
+  exit 1
+fi
+
+if [ "$FORCERENAME" = "1" ]
+then
+  mv $OUTPUTFILE $OUTPUTFILE.`date +%s`
+  echo "-f argument invoked!"
+  echo "$OUTPUTFILE renamed to $OUTPUTFILE.`date +%s`"
+elif [ -f $OUTPUTFILE ]
+then
+  echo "Output file with name $OUTPUTFILE exists."
+  echo "Please rename .files input file ($1) or use the -f"
+  echo "argument to force a rename."
+  exit 1
+fi
+
+#
+# PARSE AND SET NPROCS
+#
+if [ $NPROC -gt 20 ]
+then
+  if [ $NODES -eq 1 ]
+    then
+        echo "Please set number of nodes with the -nodes argument"
+        exit
+    fi
+fi
+
+PPN=$((NPROC/$NODES))
+NPROC=$((PPN*$NODES))
+
+if [ $NODES -gt 1 ]
+then
+	SCRATCH="/nfs/scratch"
+fi
+
+
+#
+# SET PBS OPTIONS
+#
+OPTIONS="-o /dev/null -e /dev/null -q $QUEUE"
+PBSOPTS="-N $JOBNAME -l nodes=$NODES:ppn=$PPN $PBSOPTS $PBSOPTSS"
+
+#
+# CREATE PBS INPUT FILE
+#
+TARGET=run.$$.sh
+
+cat >> $TARGET << EOF
+#!/bin/bash
+#PBS $PBSOPTS
+
+source /opt/intel/compilers_and_libraries_2017.1.132/linux/bin/compilervars.sh intel64
+. /usr/mpi/openmpi_intel/2.0.1/bin/mpivars.sh 
+
+cd $WD
+cp -f $INPUTFILE /tmp/$INPUTFILE.$USER
+sed 5s@.*@$SCRATCH/\$PBS_JOBID/tmp@ /tmp/$INPUTFILE.$USER > $INPUTFILE
+mkdir -p $SCRATCH/\$PBS_JOBID
+
+cat \`head -1 $INPUTFILE\` > $OUTPUTFILE
+
+mpirun -n $NPROC /share/apps/abinit/bin/abinit < $INPUTFILE > $OUTPUTFILE
+sleep 10 
+
+rm -rf $SCRATCH/\$PBS_JOBID
+
+mkdir optcell0
+cp * optcell0/.
+rm *
+cp optcell0/$INFILE_NAME $OPTCELL0_INFILE_NAME
+cp optcell0/$OUTFILE_NAME $OPTCELL0_OUTFILE_NAME
+cp optcell0/$CIFFILE_NAME .
+cp optcell0/$OPTIONS_NAME .
+echo 3 > OPTIONS
+cat $OPTIONS_NAME >> OPTIONS
+prepareAbinit5 $CIFFILE_NAME $BASENAME $USER $OPTCELL0_OUTFILE_NAME $OPTCELL0_INFILE_NAME < OPTIONS
+mpirun -n $NPROC /share/apps/abinit/bin/abinit < $INPUTFILE > $OUTPUTFILE
+sleep 10
+
+mkdir optcell2
+rm _STATUS*
+rm _LOG*
+cp * optcell2/.
+rm *
+cp optcell2/$INFILE_NAME $OPTCELL2_INFILE_NAME
+cp optcell2/$OUTFILE_NAME $OPTCELL2_OUTFILE_NAME
+cp optcell2/$CIFFILE_NAME .
+cp optcell2/$OPTIONS_NAME .
+echo 4 > OPTIONS
+cat $OPTIONS_NAME >> OPTIONS
+prepareAbinit5 $CIFFILE_NAME $BASENAME $USER $OPTCELL2_OUTFILE_NAME $OPTCELL2_INFILE_NAME < OPTIONS
+
+mkdir expanded contracted
+
+cp $OPTCELL2_INFILE_NAME contracted/.
+cp $OPTCELL2_OUTFILE_NAME contracted/.
+cp $CIFFILE_NAME contracted/.
+cp $OPTIONS_NAME contracted/.
+cd contracted
+echo 5 > OPTIONS
+cat $OPTIONS_NAME >> OPTIONS
+prepareAbinit5 $CIFFILE_NAME $BASENAME $USER $OPTCELL2_OUTFILE_NAME $OPTCELL2_INFILE_NAME < OPTIONS
+cd ..
+
+cp $OPTCELL2_INFILE_NAME expanded/.
+cp $OPTCELL2_OUTFILE_NAME expanded/.
+cp $CIFFILE_NAME expanded/.
+cp $OPTIONS_NAME expanded/.
+cd expanded
+echo 6 > OPTIONS
+cat $OPTIONS_NAME >> OPTIONS
+prepareAbinit5 $CIFFILE_NAME $BASENAME $USER $OPTCELL2_OUTFILE_NAME $OPTCELL2_INFILE_NAME < OPTIONS
+
+rm -rf $SCRATCH/\$PBS_JOBID
+
+EOF
+
+# Submit the input file to PBS and clean up
+qsub $OPTIONS $TARGET
+rm $TARGET
