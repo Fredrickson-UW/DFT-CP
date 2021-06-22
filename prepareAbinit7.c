@@ -3596,7 +3596,7 @@ int main (int argc, char * argv[]){
     
       //Begin processing raw CIF format data
       ProcessCIFdata(&inputCIF,calculation_mode);
-      printf("Done processing CIF data. \n\n");
+      //printf("Done processing CIF data. \n\n");
     
       //Invoke the ngkpt generation step
       if(kmesh_flag==1){
