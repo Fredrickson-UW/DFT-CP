@@ -1,0 +1,226 @@
+html {
+  font-family: Arial;
+  height: 100%;
+  width: 100%;
+}
+body {
+  height: calc(100% - 10px);
+  width: calc(100% - 10px);
+  margin: 5px;
+  padding: 0px;
+}
+p {
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+h1 {
+  margin: 10px 0px 10px 0px;
+}
+h4 {
+  margin: 10px 0px 5px 0px;
+}
+.header {
+  height: 120px;
+  background-color: #f1f1f1;
+  text-align: center;
+  color: #000000;
+  padding: 5px;
+  font-size: 40px;
+}
+.topnav {
+  height: 10px;
+  background-color: #545559;
+}
+.columns {
+  height: calc(100% - 195px);
+  width: 100%;
+  background-color:#ccc;
+}
+.column.right {
+  height: 100%;
+  width: 30%;
+  float: right;
+  overflow-y: scroll;
+}
+.column.middle {
+  height: 100%;
+  width: 70%;
+  float: left;
+}
+.middle.left {
+  width: 60%;
+  height: 95%;
+	float: left;
+  margin: 1% 0% 1% 1%;
+  border: 2px;
+  border-style: solid;
+
+}
+.middle.right {
+  width: 30%;
+  height: 95%;
+	float: left;
+  margin: 1% 1% 1% 0%;
+  border: 2px;
+  border-style: solid solid solid none;
+}
+.img {
+  vertical-align: bottom;
+}
+.footer {
+  height: 45px;
+  background-color: #f1f1f1;
+  color: #000000;
+  border-top: 10px solid;
+  border-color: #545559;
+}
+.footer p {
+  font-size: 25px;
+  text-align: center;
+  padding: 5px 5px 0px 0px;
+}
+.footer a {
+  color: #000000;
+  text-decoration: none;
+}
+.canvasbox {
+  width: calc(100% - 50px);
+  height: calc(100% - 50px);
+  margin: 25px;
+}
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 85%;
+  height: 20px;
+  background: #f1f1f1;
+  outline: none;
+  opacity: 1;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+.slider:hover {
+  background-color: #ddd;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #a2a2a2;
+  cursor: pointer;
+}
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  background: #4CAF50;
+  cursor: pointer;
+}
+.atom_slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 40%;
+  background: #f1f1f1;
+  outline: none;
+  opacity: 1;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+.atom_slider:hover {
+  background-color: #ddd;
+}
+.atom_slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #a2a2a2;
+  cursor: pointer;
+}
+.atom_slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  background: #4CAF50;
+  cursor: pointer;
+}
+.atom_color {
+  width: calc(40% + 20px);
+  float:left;
+}
+.checkbox {
+  width: 20px;
+  height: 20px;
+}
+.leftcolumn {
+	width: 50%;
+	float: left;
+  text-align: left;
+}
+.rightcolumn {
+	width: 50%;
+	float: right;
+  text-align: right;
+}
+.centercolumn {
+  width: 100%;
+  float: right;
+}
+.tab {
+  height: 50px;
+  overflow: hidden;
+  background-color: #f1f1f1;
+}
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 20px;
+  width: 50%;
+}
+.tab button:hover {
+  background-color: #ddd;
+}
+.tab button.active {
+  background-color: #ccc;
+}
+.tabcontent {
+  width: calc(100% - 10px);
+  padding: 5px 5px;
+}
+.smalltab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+.smalltab button {
+  background-color: inherit;
+  float: left;
+  border: 1px solid #aaa;
+  outline: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  transition: 0.3s;
+  font-size: 14px;
+  width: 50%;
+}
+.smalltab button:hover {
+  background-color: #ddd;
+}
+.smalltab button.active {
+  background-color: #ccc;
+}
+.smalltabcontent {
+  display: none;
+  border: 1px solid #ccc;
+  width: 80%;
+}
+
+.smalltabcontent_2 {
+  display: none;
+  border: 1px solid #ccc;
+  width: 80%;
+}

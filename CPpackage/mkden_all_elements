@@ -1,0 +1,51 @@
+#!/bin/sh
+# Real bynow
+
+if [ $# -ne 1 ]
+then
+  echo "Usage: <ABINIT files file>"
+  exit 1
+fi
+
+if [ ! -f $1 ]
+then
+  echo "File $1 not found!"
+  exit 1
+fi
+
+mk_mkden_in $1
+
+NTYPES=`head -n 1 AddCore_Info`
+i=1
+while [ $i -ne $(($NTYPES+1)) ]
+do
+  i=$(($i+1))
+  ELEMENT=`head -n $i AddCore_Info | tail -1`
+  echo "The $(($i-1)) element is: $ELEMENT"
+  cp ~/resource/apeDEN_files/$ELEMENT/* . 2>/dev/null
+  cp ~/apeDEN_files/$ELEMENT/* . 2>/dev/null
+done
+
+COUNT=0
+while [ 1 -eq 1 ]
+do
+  COUNT=$(($COUNT+1))
+  CURRENT_IN_NAME="mkden_input$COUNT"
+  if [ ! -f $CURRENT_IN_NAME ]
+  then
+    echo "$CURRENT_IN_NAME not found."
+    break 
+  fi
+  echo "mkden < $CURRENT_IN_NAME"
+  mkden < $CURRENT_IN_NAME
+done
+
+NTYPES=`head -n 1 AddCore_Info`
+i=1
+while [ $i -ne $(($NTYPES+1)) ]
+do
+  i=$(($i+1))
+  ELEMENT=`head -n $i AddCore_Info | tail -1`
+  mv $ELEMENT-0.000000 $ELEMENT-0
+done
+
